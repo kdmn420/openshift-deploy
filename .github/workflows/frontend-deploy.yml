@@ -29,6 +29,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ----------------------------------------
+      # Install OpenShift CLI
+      # ----------------------------------------
+      - name: Install OpenShift CLI
+        run: |
+          curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
+
+          tar -xzf openshift-client-linux.tar.gz
+
+          sudo mv oc kubectl /usr/local/bin/
 
       # ----------------------------------------
       # 2. Login to OpenShift
