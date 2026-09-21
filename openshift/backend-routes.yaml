@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+
+metadata:
+  name: backend-api
+
+spec:
+  host: frontend-nikhil11022000-dev.apps.rm3.7wse.p1.openshiftapps.com
+
+  path: /tasks
+
+  to:
+    kind: Service
+    name: backend
+
+  port:
+    targetPort: 5000

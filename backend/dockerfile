@@ -1,0 +1,30 @@
+#STAGE-1 ( Image source )
+
+FROM node:18-alpine
+
+#STAGE-2 ( Working directory )
+
+WORKDIR /app
+
+#STAGE-3 ( Copying files )
+
+COPY . .
+
+#STAGE-4 ( Installing dependencies )
+
+RUN npm install
+
+# Make application files writable by OpenShift's arbitrary UID.
+# Group 0 is used by OpenShift-compatible images.
+RUN chgrp -R 0 /app && \
+    chmod -R g=u /app
+
+#STAGE-5 ( Exposing port )
+
+EXPOSE 5000
+
+#STAGE-6 ( Running the app )
+
+CMD ["node", "server.js"]
+
+

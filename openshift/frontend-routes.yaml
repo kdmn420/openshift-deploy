@@ -1,0 +1,20 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+
+metadata:
+  name: frontend
+
+spec:
+  host: frontend-nikhil11022000-dev.apps.rm3.7wse.p1.openshiftapps.com
+
+  path: /
+
+  to:
+    kind: Service
+    name: frontend
+
+  port:
+    targetPort: 80
+
+  tls:
+    termination: edge
