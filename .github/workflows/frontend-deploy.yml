@@ -1,0 +1,149 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-deploy.yml'
+
+concurrency:
+  group: frontend-production-deploy
+  cancel-in-progress: false
+
+env:
+  DOCKER_IMAGE: nikhil11022000/myfrontend
+  OPENSHIFT_NAMESPACE: nikhil11022000-dev
+
+jobs:
+  frontend-deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ----------------------------------------
+      # 1. Checkout code
+      # ----------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ----------------------------------------
+      # 2. Login to OpenShift
+      # ----------------------------------------
+      - name: Login to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+
+
+      # ----------------------------------------
+      # 3. Get current deployed version
+      # ----------------------------------------
+      - name: Get and bump version
+        id: version
+        shell: bash
+        run: |
+
+          CURRENT_IMAGE=$(oc get deployment frontend \
+            -o jsonpath='{.spec.template.spec.containers[0].image}')
+
+          echo "Current deployed image:"
+          echo "$CURRENT_IMAGE"
+
+          CURRENT_VERSION=$(echo "$CURRENT_IMAGE" | \
+            sed -n 's/.*:v\([0-9]*\.[0-9]*\)$/\1/p')
+
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "ERROR: Unable to detect current version."
+            echo "Expected format: myfrontend:v1.3"
+            exit 1
+          fi
+
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+
+          NEW_MINOR=$((MINOR + 1))
+
+          NEW_VERSION="v${MAJOR}.${NEW_MINOR}"
+
+          echo "Current version: v${CURRENT_VERSION}"
+          echo "New version:     ${NEW_VERSION}"
+
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+
+
+      # ----------------------------------------
+      # 4. Login to Docker Hub
+      # ----------------------------------------
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+
+      # ----------------------------------------
+      # 5. Build frontend image
+      # ----------------------------------------
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            -t "${DOCKER_IMAGE}:${{ steps.version.outputs.version }}" \
+            ./frontend
+
+
+      # ----------------------------------------
+      # 6. Push frontend image
+      # ----------------------------------------
+      - name: Push frontend Docker image
+        run: |
+          docker push \
+            "${DOCKER_IMAGE}:${{ steps.version.outputs.version }}"
+
+
+      # ----------------------------------------
+      # 7. Update OpenShift deployment
+      # ----------------------------------------
+      - name: Deploy frontend to OpenShift
+        run: |
+          oc set image deployment/frontend \
+            frontend="${DOCKER_IMAGE}:${{ steps.version.outputs.version }}"
+
+
+      # ----------------------------------------
+      # 8. Wait for rollout
+      # ----------------------------------------
+      - name: Wait for rollout
+        run: |
+          oc rollout status deployment/frontend \
+            --timeout=5m
+
+
+      # ----------------------------------------
+      # 9. Verify deployment
+      # ----------------------------------------
+      - name: Verify deployment
+        run: |
+
+          echo "--------------------------------"
+          echo "Frontend Deployment"
+          echo "--------------------------------"
+
+          oc get deployment frontend
+
+          echo ""
+          echo "Pods:"
+          oc get pods -l app=frontend
+
+          echo ""
+          echo "Deployed Image:"
+
+          oc get deployment frontend \
+            -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+          echo ""
