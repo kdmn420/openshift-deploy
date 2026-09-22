@@ -58,7 +58,7 @@ function App() {
     return (
         <div className="App">
             <div className="container">
-                <h1>📝 My Kubernetes Task Manager</h1>
+                <h1>📝 My openshift Task Manager</h1>
 
                 <div className="input-section">
                     <input
